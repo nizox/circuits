@@ -3,12 +3,12 @@
 This module implements a set of standard HTTP Errors.
 """
 import json
+import traceback
 
 try:
     from html import escape
 except ImportError:
     from cgi import escape  # Deprecated since version 3.2
-
 
 try:
     from urllib.parse import urljoin as _urljoin
@@ -52,9 +52,10 @@ class httperror(Event):
         )
 
         if self.error is not None:
-            self.traceback = "ERROR: (%s) %s\n%s" % (
-                self.error[0], self.error[1], "".join(self.error[2])
-            )
+            #self.traceback = "ERROR: (%s) %s\n%s" % (
+            #    self.error[0], self.error[1], "".join(self.error[2])
+            #)
+            self.traceback = "\n".join(traceback.format_exception(*self.error))
         else:
             self.traceback = ""
 
