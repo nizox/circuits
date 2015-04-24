@@ -56,6 +56,10 @@ class Process(BaseComponent):
         self.stdout = BytesIO()
 
         self._status = None
+        self._terminated = False
+
+        self._stdout_closed = False
+        self._stderr_closed = False
 
         self._stdin = File(
             self.p.stdin,
@@ -72,39 +76,29 @@ class Process(BaseComponent):
             channel="{0:d}.stdout".format(self.p.pid)
         ).register(self)
 
-        self._stderr_read_handler = self.addHandler(
-            handler("read", channel="{0:d}.stderr".format(self.p.pid))(
-                self.__class__._on_stderr_read
-            )
-        )
+        @handler("closed", channel="{0:d}.stdout".format(self.p.pid))
+        def _on_stdout_closed(self):
+            self._stdout_closed = True
 
-        self._stdout_read_handler = self.addHandler(
-            handler("read", channel="{0:d}.stdout".format(self.p.pid))(
-                self.__class__._on_stdout_read
-            )
-        )
+        @handler("closed", channel="{0:d}.stderr".format(self.p.pid))
+        def _on_stderr_closed(self):
+            self._stderr_closed = True
 
-        self._stderr_closed_handler = self.addHandler(
-            handler("closed", channel="{0:d}.stderr".format(self.p.pid))(
-                self.__class__._on_stderr_closed
-            )
-        )
+        @handler("read", channel="{0:d}.stderr".format(self.p.pid))
+        def _on_stderr_read(self, data):
+            self.stderr.write(data)
 
-        self._stdout_closed_handler = self.addHandler(
-            handler("closed", channel="{0:d}.stdout".format(self.p.pid))(
-                self.__class__._on_stdout_closed
-            )
-        )
+        @handler("read", channel="{0:d}.stdout".format(self.p.pid))
+        def _on_stdout_read(self, data):
+            self.stdout.write(data)
+
+        self._stderr_read_handler = self.addHandler(_on_stderr_read)
+        self._stdout_read_handler = self.addHandler(_on_stdout_read)
+
+        self._stderr_closed_handler = self.addHandler(_on_stderr_closed)
+        self._stdout_closed_handler = self.addHandler(_on_stdout_closed)
 
         self.fire(started(self))
-
-    @staticmethod
-    def _on_stdout_closed(self):
-        self._stdout_closed = True
-
-    @staticmethod
-    def _on_stderr_closed(self):
-        self._stderr_closed = True
 
     def stop(self):
         if self.p is not None:
@@ -127,14 +121,6 @@ class Process(BaseComponent):
         if getattr(self, "p", None) is not None:
             return self.p.poll()
 
-    @staticmethod
-    def _on_stderr_read(self, data):
-        self.stderr.write(data)
-
-    @staticmethod
-    def _on_stdout_read(self, data):
-        self.stdout.write(data)
-
     @handler("generate_events")
     def _on_generate_events(self, event):
         if self.p is not None and self._status is None:
@@ -143,6 +129,7 @@ class Process(BaseComponent):
         if self._status is not None and self._stderr_closed \
                 and self._stdout_closed and not self._terminated:
             self._terminated = True
+            self.wait()
             self.removeHandler(self._stderr_read_handler)
             self.removeHandler(self._stdout_read_handler)
             self.removeHandler(self._stderr_closed_handler)
