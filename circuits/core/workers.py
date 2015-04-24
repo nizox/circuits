@@ -62,13 +62,13 @@ class Worker(BaseComponent):
 
     channel = "worker"
 
-    def init(self, process=False, workers=None, channel=channel):
+    def init(self, process=False, workers=None, **kwargs):
         if not hasattr(current_thread(), "_children"):
             current_thread()._children = WeakKeyDictionary()
 
         self.workers = workers or (cpu_count() if process else DEFAULT_WORKERS)
         Pool = ProcessPool if process else ThreadPool
-        self.pool = Pool(self.workers)
+        self.pool = Pool(self.workers, **kwargs)
 
     @handler("stopped", "unregistered", channel="*")
     def _on_stopped(self, event, *args):
