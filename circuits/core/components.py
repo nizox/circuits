@@ -109,7 +109,8 @@ class BaseComponent(Manager):
 
         super(BaseComponent, self).__init__(*args, **kwargs)
 
-        self.channel = kwargs.get("channel", self.channel) or "*"
+        # Assume channel is useless in kwargs after this
+        self.channel = kwargs.pop("channel", self.channel)
 
         for k, v in getmembers(self):
             if getattr(v, "handler", False) is True:
